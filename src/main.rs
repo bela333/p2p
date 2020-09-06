@@ -13,7 +13,7 @@ use tokio::io::BufReader;
 use tokio::time::{Duration};
 use tokio::io::AsyncBufReadExt;
 use obfuscator::AddressInfo;
-use std::net::SocketAddr;
+use std::{io::Write, net::SocketAddr};
 use clipboard::{ClipboardContext, ClipboardProvider};
 
 const PING_INTERVAL: u64 = 10;
@@ -44,6 +44,8 @@ pub async fn main(){
     let mut line_stream = BufReader::new(tokio::io::stdin()).lines();
     let mut code: Option<String> = None;
     //Constantly ping, until a new line comes
+    print!("Partner's code: ");
+    std::io::stdout().flush().unwrap();
     loop {
         tokio::select! {
             line = line_stream.next_line() => {
@@ -58,7 +60,9 @@ pub async fn main(){
     }
     let remote: AddressInfo = code.unwrap().parse().unwrap();
     println!("{}", remote.address);
-    let mut network_handler = networking::NetworkHandler::new(local_address, SocketAddr::V4(remote.address));
+    let socket_addr = socket.local_addr().unwrap();
+    drop(socket);
+    let mut network_handler = networking::NetworkHandler::new(socket_addr, SocketAddr::V4(remote.address));
     network_handler.begin().await.unwrap();
 
 }
