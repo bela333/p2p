@@ -26,6 +26,8 @@ macro_rules! implement_error {
 }
 
 implement_error!(bs58::decode::Error, "Base58 error");
+implement_error!(std::io::Error, "IO error");
+implement_error!(std::array::TryFromSliceError, "Array conversion error");
 
 impl Display for Error{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

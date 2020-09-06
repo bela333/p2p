@@ -4,23 +4,27 @@ extern crate tokio;
 
 pub mod obfuscator;
 pub mod error;
+pub mod bitfield;
+pub mod message;
+pub mod networking;
 mod test;
 
 use tokio::io::BufReader;
-use tokio::time::{self, Duration};
+use tokio::time::{Duration};
 use tokio::io::AsyncBufReadExt;
 use obfuscator::AddressInfo;
 use std::net::SocketAddr;
+use clipboard::{ClipboardContext, ClipboardProvider};
 
 const PING_INTERVAL: u64 = 10;
 
 #[tokio::main]
 pub async fn main(){
-    let (socket, address) = stunclient::just_give_me_the_udp_socket_and_its_external_address();
+    let (socket, local_address) = stunclient::just_give_me_the_udp_socket_and_its_external_address();
 
     //Convert address to IPv4 address
-    let addressv4 = {
-        if let SocketAddr::V4(address) = address{
+    let local_addressv4 = {
+        if let SocketAddr::V4(address) = local_address{
             address
         }else{
             panic!("Invalid IP type");
@@ -28,8 +32,10 @@ pub async fn main(){
     };
     
     {
-        let info = AddressInfo::new(addressv4);
-        println!("Your code is: {}", info); //Print sync code
+        let info = AddressInfo::new(local_addressv4);
+        let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+        ctx.set_contents(info.to_string()).unwrap();
+        println!("Your code is: {} (copied to clipboard)", info); //Print sync code
     }
 
     //Setup an interval for the ping messages
@@ -50,6 +56,9 @@ pub async fn main(){
             }
         }
     }
-    let info: AddressInfo = code.unwrap().parse().unwrap();
-    println!("{}", info.address);
+    let remote: AddressInfo = code.unwrap().parse().unwrap();
+    println!("{}", remote.address);
+    let mut network_handler = networking::NetworkHandler::new(local_address, SocketAddr::V4(remote.address));
+    network_handler.begin().await.unwrap();
+
 }
