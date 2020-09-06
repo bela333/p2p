@@ -39,11 +39,11 @@ impl Messages{
 }
 
 pub trait Message{
-    fn get_id(&self) -> u32;
+    const ID: u32;
     fn get_data(&self) -> Vec<u8>;
     fn get_bytes(&self) -> Vec<u8>{
         let mut buf: Vec<u8> = Vec::new();
-        buf.extend(self.get_id().to_le_bytes().iter());
+        buf.extend(Self::ID.to_le_bytes().iter());
         buf.append(&mut self.get_data());
         buf
     }
@@ -57,7 +57,7 @@ pub struct ReliableMessage{
 }
 
 impl Message for ReliableMessage{
-    fn get_id(&self) -> u32 { 0 }
+    const ID: u32 = 0;
 
     fn get_data(&self) -> Vec<u8> {
         let mut buf: Vec<u8> = Vec::new();
@@ -84,7 +84,7 @@ pub struct ReliableAckMessage{
 }
 
 impl Message for ReliableAckMessage{
-    fn get_id(&self) -> u32 { 1 }
+    const ID: u32 = 1;
 
     fn get_data(&self) -> Vec<u8> {
         self.packet_index.to_le_bytes().to_vec()
@@ -101,7 +101,7 @@ impl Message for ReliableAckMessage{
 #[derive(Clone)]
 pub struct PingMessage{}
 impl Message for PingMessage {
-    fn get_id(&self) -> u32 { 2 }
+    const ID: u32 = 2;
     fn get_data(&self) -> Vec<u8> { Vec::new() }
 
     fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>> {
