@@ -7,7 +7,8 @@ use std::convert::TryInto;
 pub enum Messages{
     Reliable(ReliableMessage),
     ReliableAck(ReliableAckMessage),
-    Ping(PingMessage)
+    Ping(PingMessage),
+    Chat(ChatMessage)
 }
 
 impl Decoder for Messages {
@@ -22,6 +23,7 @@ impl Decoder for Messages {
             0 => Messages::Reliable(*(ReliableMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
             1 => Messages::ReliableAck(*(ReliableAckMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
             2 => Messages::Ping(*(PingMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            3 => Messages::Chat(*(ChatMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
             _ => return Err(Error::new("Invalid packet ID"))
         };
         Ok(Some(message))
@@ -34,6 +36,7 @@ impl Messages{
             Messages::Reliable(a) => {a.get_bytes()}
             Messages::ReliableAck(a) => {a.get_bytes()}
             Messages::Ping(a) => {a.get_bytes()}
+            Messages::Chat(a) => {a.get_bytes()}
         }
     }
 }
@@ -67,7 +70,7 @@ impl Message for ReliableMessage{
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>> {
-        let index = u32::from_le_bytes(bytes[0..4].try_into().ok()?); //TODO: replace this unwrap
+        let index = u32::from_le_bytes(bytes[0..4].try_into().ok()?);
         let mut buf = BytesMut::new();
         buf.extend(bytes[4..].iter());
         let message = Messages::Ping(PingMessage{}).decode(&mut buf).ok()??;
@@ -91,7 +94,7 @@ impl Message for ReliableAckMessage{
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>> {
-        let index = u32::from_le_bytes(bytes[0..4].try_into().ok()?); //TODO: replace this unwrap
+        let index = u32::from_le_bytes(bytes[0..4].try_into().ok()?); 
         Some(Box::new(Self{
             packet_index: index
         }))
@@ -106,5 +109,24 @@ impl Message for PingMessage {
 
     fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>> {
         Some(Box::new(Self{}))
+    }
+}
+
+#[derive(Clone)]
+pub struct ChatMessage{
+    pub message: String
+}
+
+impl Message for ChatMessage {
+    const ID: u32 = 3;
+
+    fn get_data(&self) -> Vec<u8> {
+        self.message.as_bytes().to_vec()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>> {
+        Some(Box::new(Self{
+            message: String::from_utf8(bytes).ok()?
+        }))
     }
 }
