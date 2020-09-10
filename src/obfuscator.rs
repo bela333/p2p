@@ -39,7 +39,11 @@ impl FromStr for AddressInfo{
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        AddressInfo::from_bytes(bs58::decode(s).into_vec()?)
+        let byte_data = bs58::decode(s).into_vec()?;
+        if byte_data.len() != 6{
+            return Err(Error::new("Invalid size"));
+        }
+        AddressInfo::from_bytes(byte_data)
     }
 }
 

@@ -64,7 +64,7 @@ impl NetworkHandler{
         }
     }
 
-    pub fn get_sender(&mut self) -> Sender{
+    pub fn get_sender(&self) -> Sender{
         Sender{
             sender: self.sender.clone(),
             index: Arc::clone(&self.index),
@@ -74,7 +74,7 @@ impl NetworkHandler{
 
 
 
-    pub async fn receive(&mut self) -> Result<Messages, Error>{
+    pub async fn receive(&self) -> Result<Messages, Error>{
         self.subscribe().recv().await.map_err(|_| Error::new("Packet receive error"))
     }
 
@@ -82,7 +82,7 @@ impl NetworkHandler{
         self.receiver_in.subscribe()
     }
 
-    pub async fn begin(&mut self) -> Result<(), Error>{
+    pub async fn begin(&self) -> Result<(), Error>{
         let client = UdpSocket::bind(self.local_addr).await?;
         client.connect(self.remote_addr).await?;
         let (mut udp_receiver, mut udp_sender) = client.split();
@@ -141,5 +141,16 @@ impl NetworkHandler{
             }
         });
         Ok(())
+    }
+
+    
+
+    pub async fn wait_for_connection(&self){
+        let mut receiver = self.subscribe();
+        while let Ok(message) =  receiver.recv().await {
+            if let Messages::Ping(_) = message{
+                break;
+            }
+        }
     }
 }

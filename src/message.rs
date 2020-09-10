@@ -8,7 +8,8 @@ pub enum Messages{
     Reliable(ReliableMessage),
     ReliableAck(ReliableAckMessage),
     Ping(PingMessage),
-    Chat(ChatMessage)
+    FileTransferRequest(FileTransferRequestMessage)
+    
 }
 
 impl Decoder for Messages {
@@ -23,7 +24,7 @@ impl Decoder for Messages {
             0 => Messages::Reliable(*(ReliableMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
             1 => Messages::ReliableAck(*(ReliableAckMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
             2 => Messages::Ping(*(PingMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
-            3 => Messages::Chat(*(ChatMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            3 => Messages::FileTransferRequest(*(FileTransferRequestMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
             _ => return Err(Error::new("Invalid packet ID"))
         };
         Ok(Some(message))
@@ -36,7 +37,7 @@ impl Messages{
             Messages::Reliable(a) => {a.get_bytes()}
             Messages::ReliableAck(a) => {a.get_bytes()}
             Messages::Ping(a) => {a.get_bytes()}
-            Messages::Chat(a) => {a.get_bytes()}
+            Messages::FileTransferRequest(a) => {a.get_bytes()}
         }
     }
 }
@@ -113,20 +114,37 @@ impl Message for PingMessage {
 }
 
 #[derive(Clone)]
-pub struct ChatMessage{
-    pub message: String
+pub struct FileTransferRequestMessage{
+    pub filename: String,
+    pub filesize: u64
 }
 
-impl Message for ChatMessage {
+impl Message for FileTransferRequestMessage {
     const ID: u32 = 3;
 
     fn get_data(&self) -> Vec<u8> {
-        self.message.as_bytes().to_vec()
+        let mut buf = BytesMut::new();
+        let filename_buffer = self.filename.as_bytes();
+        buf.extend((filename_buffer.len() as u32).to_le_bytes().iter());
+        buf.extend(filename_buffer);
+        buf.extend(self.filesize.to_le_bytes().iter());
+        buf.to_vec()
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>> {
+        if bytes.len() < 4+8{
+            return None;
+        }
+        let filename_size = u32::from_le_bytes(bytes[0..4].try_into().ok()?) as usize;
+        if bytes.len() < (4+8+filename_size) as usize{
+            return None;
+        }
+        let filename = String::from_utf8(bytes[4..4+filename_size].to_vec()).ok()?;
+        let filesize = u64::from_le_bytes(bytes[4+filename_size..4+filename_size+8].try_into().ok()?);
         Some(Box::new(Self{
-            message: String::from_utf8(bytes).ok()?
+            filename,
+            filesize
         }))
+
     }
 }
