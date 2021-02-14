@@ -1,5 +1,5 @@
 use tokio_util::codec::Decoder;
-use crate::error::Error;
+use crate::{error::Error, bitfield::Bitfield};
 use bytes::BytesMut;
 use std::convert::TryInto;
 
@@ -8,7 +8,17 @@ pub enum Messages{
     Reliable(ReliableMessage),
     ReliableAck(ReliableAckMessage),
     Ping(PingMessage),
-    FileTransferRequest(FileTransferRequestMessage)
+
+    FileTransferRequest(FileTransferRequestMessage),
+    FileTransferAccept(FileTransferAcceptMessage),
+    PartBegin(PartBeginMessage),
+    Chunk(ChunkMessage),
+    PartEnd(PartEndMessage),
+    TransferIncomplete(TransferIncompleteMessage),
+    TransferSuccessful(TransferSuccessfulMessage),
+    WriteFile(WriteFileMessage),
+    Goodbye(GoodbyeMessage)
+
     
 }
 
@@ -21,10 +31,18 @@ impl Decoder for Messages {
         let message_id = u32::from_le_bytes(src[0..4].try_into()?);
         let rest = src[4..].to_vec();
         let message = match message_id {
-            0 => Messages::Reliable(*(ReliableMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
-            1 => Messages::ReliableAck(*(ReliableAckMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
-            2 => Messages::Ping(*(PingMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
-            3 => Messages::FileTransferRequest(*(FileTransferRequestMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            0  => Messages::Reliable(*(ReliableMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            1  => Messages::ReliableAck(*(ReliableAckMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            2  => Messages::Ping(*(PingMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            3  => Messages::FileTransferRequest(*(FileTransferRequestMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            4  => Messages::FileTransferAccept(*(FileTransferAcceptMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            5  => Messages::PartBegin(*(PartBeginMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            6  => Messages::Chunk(*(ChunkMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            7  => Messages::PartEnd(*(PartEndMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            8  => Messages::TransferIncomplete(*(TransferIncompleteMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            9  => Messages::TransferSuccessful(*(TransferSuccessfulMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            10 => Messages::WriteFile(*(WriteFileMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
+            11 => Messages::Goodbye(*(GoodbyeMessage::from_bytes(rest).ok_or(Error::new("Invalid data"))?)),
             _ => return Err(Error::new("Invalid packet ID"))
         };
         Ok(Some(message))
@@ -38,6 +56,14 @@ impl Messages{
             Messages::ReliableAck(a) => {a.get_bytes()}
             Messages::Ping(a) => {a.get_bytes()}
             Messages::FileTransferRequest(a) => {a.get_bytes()}
+            Messages::FileTransferAccept(a) => {a.get_bytes()}
+            Messages::PartBegin(a) => {a.get_bytes()}
+            Messages::Chunk(a) => {a.get_bytes()}
+            Messages::PartEnd(a) => {a.get_bytes()}
+            Messages::TransferIncomplete(a) => {a.get_bytes()}
+            Messages::TransferSuccessful(a) => {a.get_bytes()}
+            Messages::WriteFile(a) => {a.get_bytes()}
+            Messages::Goodbye(a) => {a.get_bytes()}
         }
     }
 }
@@ -146,5 +172,159 @@ impl Message for FileTransferRequestMessage {
             filesize
         }))
 
+    }
+}
+
+#[derive(Clone)]
+pub struct FileTransferAcceptMessage{
+
+}
+impl Message for FileTransferAcceptMessage {
+    const ID: u32 = 4;
+    fn get_data(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>>{
+        Some(Box::new(Self{}))
+    }
+}
+#[derive(Clone)]
+pub struct PartBeginMessage{
+    pub chunk_count: u32,
+    pub chunk_size: u32,
+    pub part_number: u32
+}
+impl Message for PartBeginMessage {
+    const ID: u32 = 5;
+    fn get_data(&self) -> Vec<u8> {
+        let mut buf = BytesMut::new();
+        buf.extend(self.chunk_count.to_le_bytes().iter());
+        buf.extend(self.chunk_size.to_le_bytes().iter());
+        buf.extend(self.part_number.to_le_bytes().iter());
+        buf.to_vec()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>>{
+        if bytes.len() < 3*4{
+            return None;
+        }
+        let chunk_count = u32::from_le_bytes(bytes[0..4].try_into().ok()?);
+        let chunk_size = u32::from_le_bytes(bytes[4..8].try_into().ok()?);
+        let part_number = u32::from_le_bytes(bytes[8..12].try_into().ok()?);
+        Some(Box::new(Self{
+            chunk_count,
+            chunk_size,
+            part_number
+        }))
+    }
+}
+#[derive(Clone)]
+pub struct ChunkMessage{
+    pub index: u32,
+    pub part_number: u32,
+    pub data: Vec<u8>
+}
+impl Message for ChunkMessage {
+    const ID: u32 = 6;
+    fn get_data(&self) -> Vec<u8> {
+        let mut buf = BytesMut::new();
+        buf.extend(self.index.to_le_bytes().iter());
+        buf.extend(self.part_number.to_le_bytes().iter());
+        buf.extend(self.data.iter());
+        buf.to_vec()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>>{
+        if bytes.len() < 8{
+            return None;
+        }
+        let index = u32::from_le_bytes(bytes[0..4].try_into().ok()?);
+        let part_number = u32::from_le_bytes(bytes[4..8].try_into().ok()?);
+        let data: Vec<u8> = bytes[8..].try_into().unwrap();
+        Some(Box::new(Self{
+            index, 
+            data,
+            part_number
+        }))
+    }
+}
+#[derive(Clone)]
+pub struct PartEndMessage{
+
+}
+impl Message for PartEndMessage {
+    const ID: u32 = 7;
+    fn get_data(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>>{
+        Some(Box::new(Self{}))
+    }
+}
+#[derive(Clone)]
+pub struct TransferIncompleteMessage{
+    pub bitfield: Bitfield
+}
+impl Message for TransferIncompleteMessage {
+    const ID: u32 = 8;
+    fn get_data(&self) -> Vec<u8> {
+        self.bitfield.get_bytes().clone()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>>{
+        let bitfield = Bitfield::from_bytes(bytes);
+        Some(Box::new(Self{
+            bitfield
+        }))
+    }
+}
+#[derive(Clone)]
+pub struct TransferSuccessfulMessage{
+
+}
+impl Message for TransferSuccessfulMessage {
+    const ID: u32 = 9;
+    fn get_data(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>>{
+        Some(Box::new(Self{}))
+    }
+}
+#[derive(Clone)]
+pub struct WriteFileMessage{
+    pub bytes: u32
+}
+impl Message for WriteFileMessage {
+    const ID: u32 = 10;
+    fn get_data(&self) -> Vec<u8> {
+        self.bytes.to_le_bytes().to_vec()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>>{
+        if bytes.len() < 4{
+            return None;
+        }
+        let bytes_length = u32::from_le_bytes(bytes[0..4].try_into().ok()?);
+        Some(Box::new(Self{
+            bytes: bytes_length
+        }))
+    }
+}
+#[derive(Clone)]
+pub struct GoodbyeMessage{
+
+}
+impl Message for GoodbyeMessage {
+    const ID: u32 = 11;
+    fn get_data(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Option<Box<Self>>{
+        Some(Box::new(Self{}))
     }
 }

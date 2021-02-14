@@ -23,7 +23,7 @@ pub struct Sender{
 
 impl Sender{
     pub fn send(&self, message: Messages) -> Result<(), Error>{
-        self.sender.send(message).map_err(|_| Error::new("Packet send error"))?;
+        self.sender.send(message).map_err(|a| Error::new("Packet send error: "))?;
         Ok(())
     }
 
@@ -90,25 +90,31 @@ impl NetworkHandler{
         //Send messages to peer
         let mut sender_out = self.sender.subscribe();
         tokio::spawn(async move {
-            while let Ok(msg) = sender_out.recv().await{
-                let bytes_vec = msg.get_bytes();
-                let bytes = bytes_vec.as_slice();
-                udp_sender.send(bytes).await.unwrap();
+            loop {
+                let msg = sender_out.recv().await;
+                if let Ok(msg) = msg{
+                    let bytes_vec = msg.get_bytes();
+                    let bytes = bytes_vec.as_slice();
+                    udp_sender.send(bytes).await.unwrap();
+                }
             }
+
         });
         //Receive messages from peer
         let receiver_in = self.receiver_in.clone();
         tokio::spawn(async move{
             let mut buf = [0; 2048];
             
-            while let Ok(size) = udp_receiver.recv(&mut buf).await {
-                if size < 4{
-                    continue;
+            loop {
+                if let Ok(size) =  udp_receiver.recv(&mut buf).await{
+                    if size < 4{
+                        continue;
+                    }
+                    let mut bytes = BytesMut::new();
+                    bytes.extend(buf.iter().take(size));
+                    let data = codec.decode(&mut bytes).ok().unwrap().unwrap(); //TODO: replace unwrap
+                    receiver_in.send(data).map_err(|_| Error::new("Broadcast send error")).unwrap();
                 }
-                let mut bytes = BytesMut::new();
-                bytes.extend(buf.iter().take(size));
-                let data = codec.decode(&mut bytes).ok().unwrap().unwrap(); //TODO: replace unwrap
-                receiver_in.send(data).map_err(|_| Error::new("Broadcast send error")).unwrap();
             }
         });
         //Handle reliable messages
@@ -117,17 +123,20 @@ impl NetworkHandler{
         let receiver_in = self.receiver_in.clone();
         let sender = self.get_sender();
         tokio::spawn(async move{
-            while let Ok(msg) = receiver.recv().await {
-                if let Messages::Reliable(msg) = msg{
-                    let mut received_messages = received_messages.lock().unwrap();
-                    if !received_messages.get(msg.packet_index as usize){
-                        received_messages.set(msg.packet_index as usize, true);
-                        receiver_in.send(*msg.message).map_err(|_| Error::new("Broadcast send error")).unwrap();
+
+            loop {
+                if let Ok(msg) = receiver.recv().await {
+                    if let Messages::Reliable(msg) = msg{
+                        let mut received_messages = received_messages.lock().unwrap();
+                        if !received_messages.get(msg.packet_index as usize){
+                            received_messages.set(msg.packet_index as usize, true);
+                            receiver_in.send(*msg.message).map_err(|_| Error::new("Broadcast send error")).unwrap();
+                        }
+                        
+                        sender.send(Messages::ReliableAck(ReliableAckMessage{
+                            packet_index: msg.packet_index
+                        })).unwrap();
                     }
-                    
-                    sender.send(Messages::ReliableAck(ReliableAckMessage{
-                        packet_index: msg.packet_index
-                    })).unwrap();
                 }
             }
         });

@@ -47,7 +47,7 @@ pub async fn main(){
 
 
     let (socket, local_address) = stunclient::just_give_me_the_udp_socket_and_its_external_address();
-    let local_address = SocketAddr::new(IpAddr::V4("127.0.0.1".parse().unwrap()), socket.local_addr().unwrap().port());
+    //let local_address = SocketAddr::new(IpAddr::V4("127.0.0.1".parse().unwrap()), socket.local_addr().unwrap().port());
     //Convert address to IPv4 address
     let local_addressv4 = {
         if let SocketAddr::V4(address) = local_address{

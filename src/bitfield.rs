@@ -51,4 +51,26 @@ impl Bitfield {
             self.bytes.extend(iter::repeat(0).take(required_size - self.bytes.len()))
         }
     }
+
+    pub fn iter(&self) -> BitfieldIterator{
+        BitfieldIterator{
+            bitfield: self,
+            idx: 0
+        }
+    }
+}
+
+pub struct BitfieldIterator<'a>{
+    bitfield: &'a Bitfield,
+    idx: usize
+}
+
+impl<'a> std::iter::Iterator for BitfieldIterator<'a>{
+    type Item = bool;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let val = self.bitfield.get(self.idx);
+        self.idx += 1;
+        Some(val)
+    }
 }

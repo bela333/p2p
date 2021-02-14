@@ -30,8 +30,17 @@ mod tests{
             assert_eq!(bitfield.get(idx), value);
         }
 
+        
+        let iter = bitfield.iter();
+        assert!(iter.take(2).all(|a| a == true));
+        let iter = bitfield.iter();
+        assert!(iter.skip(2).take(6).all(|a| a == false));
+        let iter = bitfield.iter();
+        assert!(iter.skip(2).take(100).all(|a| a == false));
+
         bitfield.set(145, true);
         assert_eq!(bitfield.get(145), true);
         assert_eq!(bitfield.get_bytes()[145/8], 0b00000010);
+
     }
 }
