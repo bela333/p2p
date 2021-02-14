@@ -17,7 +17,7 @@ pub async fn begin(handler: NetworkHandler){
                     sender.send_reliable(msg).await.unwrap();      
                 },
                 Messages::PartBegin(msg) =>{
-                    println!("Beginning part {}, which is {}*{} byte chunks", msg.part_number, msg.chunk_count, msg.chunk_size)
+                    println!("Beginning part {}, which is {} byte", msg.part_number, msg.part_size)
                 },
                 Messages::Chunk(msg) => {
                     println!("Incoming chunk #{}. Part of part {} and is {} bytes", msg.index, msg.part_number, msg.data.len())

@@ -191,7 +191,7 @@ impl Message for FileTransferAcceptMessage {
 }
 #[derive(Clone)]
 pub struct PartBeginMessage{
-    pub chunk_count: u32,
+    pub part_size: u32,
     pub chunk_size: u32,
     pub part_number: u32
 }
@@ -199,7 +199,7 @@ impl Message for PartBeginMessage {
     const ID: u32 = 5;
     fn get_data(&self) -> Vec<u8> {
         let mut buf = BytesMut::new();
-        buf.extend(self.chunk_count.to_le_bytes().iter());
+        buf.extend(self.part_size.to_le_bytes().iter());
         buf.extend(self.chunk_size.to_le_bytes().iter());
         buf.extend(self.part_number.to_le_bytes().iter());
         buf.to_vec()
@@ -209,11 +209,11 @@ impl Message for PartBeginMessage {
         if bytes.len() < 3*4{
             return None;
         }
-        let chunk_count = u32::from_le_bytes(bytes[0..4].try_into().ok()?);
+        let part_size = u32::from_le_bytes(bytes[0..4].try_into().ok()?);
         let chunk_size = u32::from_le_bytes(bytes[4..8].try_into().ok()?);
         let part_number = u32::from_le_bytes(bytes[8..12].try_into().ok()?);
         Some(Box::new(Self{
-            chunk_count,
+            part_size,
             chunk_size,
             part_number
         }))

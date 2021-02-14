@@ -48,7 +48,7 @@ pub async fn send_part<T: BufRead>(handler: &NetworkHandler, file: &mut T, chunk
     println!("Sending part {}", partno);
     {
         let msg = Messages::PartBegin(PartBeginMessage{
-            chunk_count,
+            part_size: chunks.iter().map(|chunk|chunk.len()).sum::<usize>() as u32,
             chunk_size,
             part_number: partno
         });
