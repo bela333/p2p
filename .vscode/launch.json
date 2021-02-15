@@ -19,7 +19,25 @@
                     "kind": "bin"
                 }
             },
-            "args": [".gitignore"],
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'p2p' in send mode",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=p2p",
+                    "--package=p2p"
+                ],
+                "filter": {
+                    "name": "p2p",
+                    "kind": "bin"
+                }
+            },
+            "args": ["random"],
             "cwd": "${workspaceFolder}"
         },
         {

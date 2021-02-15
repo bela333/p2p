@@ -1,10 +1,10 @@
 #[cfg(test)]
-mod tests{
+mod tests {
     use crate::{bitfield::Bitfield, obfuscator::AddressInfo};
     use std::net::SocketAddrV4;
 
     #[test]
-    fn bytes_to_string(){
+    fn bytes_to_string() {
         let addr = SocketAddrV4::new("192.168.0.111".parse().unwrap(), 6543);
         println!("Address: {}", addr);
         let info = AddressInfo::new(addr);
@@ -15,7 +15,7 @@ mod tests{
     }
 
     #[test]
-    fn bitfield(){
+    fn bitfield() {
         let mut bitfield = Bitfield::new();
         bitfield.set(1, true);
         bitfield.set(0, true);
@@ -26,11 +26,13 @@ mod tests{
         bitfield.set(3, false);
         assert_eq!(bitfield.get_bytes()[0], 0b00000011);
 
-        for (idx, &value) in [true, true, false, false, false, false, false, false].iter().enumerate(){
+        for (idx, &value) in [true, true, false, false, false, false, false, false]
+            .iter()
+            .enumerate()
+        {
             assert_eq!(bitfield.get(idx), value);
         }
 
-        
         let iter = bitfield.iter();
         assert!(iter.take(2).all(|a| a == true));
         let iter = bitfield.iter();
@@ -40,7 +42,6 @@ mod tests{
 
         bitfield.set(145, true);
         assert_eq!(bitfield.get(145), true);
-        assert_eq!(bitfield.get_bytes()[145/8], 0b00000010);
-
+        assert_eq!(bitfield.get_bytes()[145 / 8], 0b00000010);
     }
 }
